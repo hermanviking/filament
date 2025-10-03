@@ -18,9 +18,11 @@ class Products extends Model
         'name',
         'price',
         'description',
+        'category',
         'image',
         'item_price_class_id',
-
+        'rating_rate',
+        'rating_count',
     ];
 
     public function orders()

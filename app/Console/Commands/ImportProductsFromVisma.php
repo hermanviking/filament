@@ -2,17 +2,20 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
+use App\Models\Products;
 use GuzzleHttp\Client;
-use App\Models\Products; // Assuming you have a Product model
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 
 class ImportProductsFromVisma extends Command
 {
+    private const PAGE_SIZE = 100;
+
     protected $signature = 'import:visma-products';
     protected $description = 'Import products from Visma.net API';
 
-    private $client;
-    private $accessToken;
+    private Client $client;
+    private ?string $accessToken = null;
 
     public function __construct()
     {
@@ -20,66 +23,125 @@ class ImportProductsFromVisma extends Command
         $this->client = new Client();
     }
 
-    public function handle()
+    public function handle(): int
     {
         $this->info('Fetching products from Visma.net API...');
 
-        // Obtain access token
         $this->accessToken = $this->getAccessToken();
 
-        // Display message if the token is successfully received
-        if ($this->accessToken) {
-            $this->info('Access token successfully received.');
-        } else {
+        if (!$this->accessToken) {
             $this->error('Failed to receive access token.');
-            return; // Exit early if the token couldn't be retrieved
+
+            return self::FAILURE;
         }
 
-        // Fetch products (pagination is handled here)
         $page = 1;
-        $products = [];
-        $hasMoreProducts = true;
+        $totalImported = 0;
 
-        while ($hasMoreProducts) {
-            $fetchedProducts = $this->fetchProducts($page);
+        while (true) {
+            $products = $this->fetchProducts($page);
 
-            $this->info('Fetched Products for page ' . $page . ': ' . json_encode($fetchedProducts, JSON_PRETTY_PRINT));
+            if ($products === null) {
+                return self::FAILURE;
+            }
 
-            if (empty($fetchedProducts)) {
-                $this->error('No products fetched or error in fetching.');
+            if (empty($products)) {
                 break;
             }
 
-            $products = array_merge($products, $fetchedProducts);
+            $importedThisPage = 0;
 
-            // Check if there's another page of products
-            $hasMoreProducts = count($fetchedProducts) >= 10; // Assuming 10 is the page size
+            foreach ($products as $productData) {
+                $payload = $this->mapProductData($productData);
+
+                if (blank($payload['sku'])) {
+                    $this->warn('Skipped product without SKU.');
+                    continue;
+                }
+
+                Products::updateOrCreate(
+                    ['sku' => $payload['sku']],
+                    $payload
+                );
+
+                $importedThisPage++;
+                $totalImported++;
+            }
+
+            $this->info(sprintf('Imported %d products from page %d.', $importedThisPage, $page));
+
+            if (count($products) < self::PAGE_SIZE) {
+                break;
+            }
+
             $page++;
         }
 
-        if (!empty($products)) {
-            // Store products in the database
-            foreach ($products as $productData) {
-                Product::updateOrCreate(
-                    ['inventoryId' => $productData['id']], // Assuming the 'id' can be used as SKU
-                    [
-                        'description' => $productData['name'],
-                        'defaultPrice' => $productData['price'],
-                    ]
-                );
-            }
-            $this->info('Products imported successfully!');
-        } else {
-            $this->info('No products to import.');
-        }
+        $this->info(sprintf('Products imported successfully (%d items).', $totalImported));
+
+        return self::SUCCESS;
     }
 
-    private function getAccessToken()
+    private function mapProductData(array $productData): array
     {
-        $url = 'https://connect.visma.com/connect/token'; // Update with the correct token URL
-        $clientId = env('VISMA_CLIENT_ID'); // Set your client ID in .env
-        $clientSecret = env('VISMA_CLIENT_SECRET'); // Set your client secret in .env
-        $tenantId = env('VISMA_TENANT_ID'); // Set your tenant ID in .env
+        $defaultPrice = data_get($productData, 'defaultPrice.amount', data_get($productData, 'defaultPrice', 0));
+
+        if (is_array($defaultPrice)) {
+            $defaultPrice = 0;
+        }
+
+        return [
+            'sku' => data_get($productData, 'inventoryNumber', data_get($productData, 'inventoryId')),
+            'name' => data_get($productData, 'description', data_get($productData, 'inventoryNumber', '')),
+            'description' => data_get($productData, 'longDescription', data_get($productData, 'description', '')),
+            'category' => data_get($productData, 'itemClassId', data_get($productData, 'itemClass', '')),
+            'image' => data_get($productData, 'imageUrl'),
+            'price' => (float) $defaultPrice,
+            'item_price_class_id' => data_get($productData, 'priceClassId', data_get($productData, 'priceClassID')),
+            'rating_rate' => data_get($productData, 'rating.rate'),
+            'rating_count' => data_get($productData, 'rating.count'),
+        ];
+    }
+
+    private function fetchProducts(int $page): ?array
+    {
+        $response = Http::withToken($this->accessToken)
+            ->acceptJson()
+            ->get('https://integration.visma.net/API/controller/api/v1/inventory', [
+                'status' => 'Active',
+                'inventoryTypes' => 'FinishedGoodItem',
+                'pageSize' => self::PAGE_SIZE,
+                'pageNumber' => $page,
+            ]);
+
+        if ($response->failed()) {
+            $this->error(sprintf('Error fetching products from page %d (status %d).', $page, $response->status()));
+            $this->error((string) $response->body());
+
+            return null;
+        }
+
+        $payload = $response->json();
+
+        if (isset($payload['data']) && is_array($payload['data'])) {
+            return $payload['data'];
+        }
+
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        $this->error('Unexpected product payload structure.');
+
+        return null;
+    }
+
+    private function getAccessToken(): ?string
+    {
+        $url = 'https://connect.visma.com/connect/token';
+        $clientId = env('VISMA_CLIENT_ID');
+        $clientSecret = env('VISMA_CLIENT_SECRET');
+        $tenantId = env('VISMA_TENANT_ID');
 
         try {
             $response = $this->client->post($url, [
@@ -87,67 +149,24 @@ class ImportProductsFromVisma extends Command
                     'grant_type' => 'client_credentials',
                     'client_id' => $clientId,
                     'client_secret' => $clientSecret,
-                    'scope' => 'vismanet_erp_service_api:read', // Adjust if needed
-                    'tenant_id' => $tenantId // Add tenant_id to the request
+                    'scope' => 'vismanet_erp_service_api:read',
+                    'tenant_id' => $tenantId,
                 ],
             ]);
+        } catch (\Throwable $exception) {
+            $this->error('Error fetching access token: ' . $exception->getMessage());
 
-            $data = json_decode($response->getBody(), true);
-
-            if (!isset($data['access_token'])) {
-                $this->error('Error: No access token returned.');
-                return null;  // Return null if access token is not received
-            }
-
-            return $data['access_token'];  // Return the access token if received
-        } catch (\Exception $e) {
-            $this->error('Error fetching access token: ' . $e->getMessage());
-            return null;  // Return null on error
+            return null;
         }
+
+        $data = json_decode($response->getBody(), true);
+
+        if (!is_array($data) || !isset($data['access_token'])) {
+            $this->error('Error: No access token returned.');
+
+            return null;
+        }
+
+        return $data['access_token'];
     }
-
-    function fetchProducts($page)
-    {
-        $url = 'https://integration.visma.net/API/controller/api/v1/inventory?pageSize=10&page=' . $page; // Add pagination to the URL
-    
-        try {
-            $response = $this->client->get($url, [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $this->accessToken,
-                    'Content-Type' => 'application/json',
-                ],
-            ]);
-    
-            $data = json_decode($response->getBody(), true);
-    
-            // Log the raw API Response for debugging purposes
-            $this->info('Raw API Response for page ' . $page . ': ' . json_encode($data));
-    
-            // Check if the response contains the expected products
-            return isset($data['data']) ? $data['data'] : []; // Adjust based on actual response structure
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            // Handle the error and capture the full response body
-            $responseBody = $e->getResponse() ? (string) $e->getResponse()->getBody() : 'No response body';
-            $this->error('Error fetching products from page ' . $page . ': ' . $e->getMessage());
-            $this->error('Full API Error Response: ' . $responseBody); // Log the full error response
-    
-            return [];
-        }
-    }
-
-    protected function processData(array $data)
-    {
-        // Example: Iterate over the data and perform actions (e.g., saving to DB)
-        foreach ($data as $item) {
-            Product::updateOrCreate(
-                ['sku' => $item['inventoryId']], // Assuming the 'id' can be used as SKU
-                [
-                    'name' => $item['description'],
-                    'price' => $item['defaultPrice'],
-                ]
-            );
-            
-        }
-
-        $this->info('Data processed successfully!');
-    }}
+}
