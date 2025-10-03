@@ -1,0 +1,33 @@
+/vendor/
+/node_modules/
+/public/hot
+/public/build
+/public/storage
+/storage/*.key
+/storage/app/*
+!/storage/app/.gitignore
+/storage/framework/*
+!/storage/framework/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+
+# Environment & secrets
+.env
+.env.*.backup
+.env.backup
+.phpunit.result.cache
+
+# OS / IDE junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Test coverage & misc
+/coverage/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
