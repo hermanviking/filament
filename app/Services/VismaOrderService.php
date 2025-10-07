@@ -324,20 +324,13 @@ class VismaOrderService
             throw new RuntimeException('Visma credentials are not configured.');
         }
 
-        $scope = env('VISMA_SCOPE', 'vismanet_erp_service_api');
-
-        $tokenPayload = [
+        $response = Http::asForm()->post('https://connect.visma.com/connect/token', [
             'grant_type' => 'client_credentials',
             'client_id' => $clientId,
             'client_secret' => $clientSecret,
             'tenant_id' => $tenantId,
-        ];
-
-        if (filled($scope)) {
-            $tokenPayload['scope'] = $scope;
-        }
-
-        $response = Http::asForm()->post('https://connect.visma.com/connect/token', $tokenPayload);
+            'scope' => 'vismanet_erp_service_api:read vismanet_erp_service_api:write',
+        ]);
 
         if ($response->failed()) {
             throw new RuntimeException(sprintf(
