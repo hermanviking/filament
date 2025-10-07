@@ -1,6 +1,6 @@
 ## Filament Order Management
 
-This project extends the default Filament admin panel with Visma.net ERP order synchronisation. You can:
+This project extends the default Filament admin panel with Visma.net ERP order synchronisation using the [Visma Sales Order API](https://salesorder.visma.net/swagger/index.html). You can:
 
 - Create or edit orders in Filament and automatically calculate line discounts based on the Visma discount matrix.
 - Push newly created or updated orders to Visma from the create/edit pages or the list table.
@@ -26,7 +26,7 @@ The exact steps depend on your hosting environment, but a typical deployment for
    npm ci
    npm run build
    ```
-4. **Set environment variables** by updating `.env` or the hosting control panel with the Visma keys described in [docs/visma-order-sync.md](docs/visma-order-sync.md). Ensure the `VISMA_SCOPE` value includes `vismanet_erp_service_api:create` and `vismanet_erp_service_api:update` so the integration can create and update orders, and configure the database and queue settings for production.
+4. **Set environment variables** by updating `.env` or the hosting control panel with the Visma keys described in [docs/visma-order-sync.md](docs/visma-order-sync.md). Ensure the `VISMA_SCOPE` value includes `vismanet_erp_service_api:create` and `vismanet_erp_service_api:update` so the integration can create and update orders, configure `VISMA_SALES_ORDER_TYPE` to the Visma document type segment used in the Sales Order API path (default `SO`), and configure the database and queue settings for production.
 5. **Configure storage**
    ```bash
    php artisan storage:link

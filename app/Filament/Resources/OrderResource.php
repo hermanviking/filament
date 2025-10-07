@@ -181,6 +181,10 @@ class OrderResource extends Resource
                         ->label('Visma Order #')
                         ->disabled()
                         ->dehydrated(false),
+                    TextInput::make('visma_sales_order_type')
+                        ->label('Visma Order Type')
+                        ->disabled()
+                        ->dehydrated(false),
                     TextInput::make('visma_status')
                         ->label('Visma Status')
                         ->disabled()
@@ -213,6 +217,10 @@ class OrderResource extends Resource
                     ->label('Visma Order #')
                     ->sortable()
                     ->toggleable(),
+                Tables\Columns\TextColumn::make('visma_sales_order_type')
+                    ->label('Visma Type')
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('visma_status')
                     ->label('Visma Status')
                     ->toggleable()

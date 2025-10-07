@@ -1,6 +1,6 @@
 # Visma Order Sync Guide
 
-This document explains how to configure, run, and troubleshoot the Visma order integration that was added to the Filament admin panel.
+This document explains how to configure, run, and troubleshoot the Visma order integration that was added to the Filament admin panel. The integration talks to the [Visma Sales Order API](https://salesorder.visma.net/swagger/index.html).
 
 ## Prerequisites
 
@@ -21,12 +21,18 @@ VISMA_TENANT_ID="your-tenant-id"
 VISMA_TENANT_ID_LIVE="your-live-tenant-id" # optional fallback if you use a separate live tenant id
 VISMA_SCOPE="vismanet_erp_service_api:create vismanet_erp_service_api:update"
 VISMA_DEFAULT_CURRENCY="NOK"
+VISMA_SALES_ORDER_TYPE="SO" # Visma document type for sales orders
 ```
 
 The default scope string grants permission to create and update sales orders. If your Visma Connect application exposes
 additional scopes (for example `vismanet_erp_service_api:read` or `vismanet_erp_service_api:write`), list them space separated
 in `VISMA_SCOPE`. Leaving the variable empty removes the `scope` parameter from the token request entirely, which is useful for
 legacy tenants that expect the default access.
+
+`VISMA_SALES_ORDER_TYPE` controls the Visma document type segment that is sent with order create/update requests and used when
+retrieving existing orders. The Sales Order API expects requests in the form `/SalesOrders/{type}/{orderId}`; configure the
+type (for example `SO`, `BB`, etc.) so the integration can resolve the correct endpoint and avoid 404 "Document could not be
+found" errors during syncs.
 
 After editing the environment file remember to reload PHP-FPM (or the queue worker) so the new variables are picked up.
 
@@ -66,6 +72,10 @@ Use the **Refresh from Visma** action in the list or edit pages to pull the late
 - **Missing product** – ensure the Visma `inventoryId` or SKU exists on the local product. Re-run your Visma product import if required.
 - **Authentication errors** – double check your client id/secret/tenant id combination, ensure the Visma app has the required scopes,
   and adjust `VISMA_SCOPE` if Visma reports `invalid_scope` during the token request.
+- **Order not found (404)** – confirm the Visma sales order number exists and that `VISMA_SALES_ORDER_TYPE` (or the
+  per-order `visma_sales_order_type` value) matches the document type the order was created with. The integration will
+  retry without an explicit type if the first lookup fails, but Visma still requires the correct type segment for most
+  tenants.
 - **Discounts not applying** – confirm the `customer_price_class_id` is populated on the customer and `item_price_class_id` is set on each product.
 - **Timeouts** – Visma occasionally throttles calls. The integration already logs payloads/responses; review the logs and retry the action from Filament.
 
