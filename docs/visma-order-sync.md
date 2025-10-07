@@ -19,13 +19,14 @@ VISMA_CLIENT_ID="your-app-client-id"
 VISMA_CLIENT_SECRET="your-app-client-secret"
 VISMA_TENANT_ID="your-tenant-id"
 VISMA_TENANT_ID_LIVE="your-live-tenant-id" # optional fallback if you use a separate live tenant id
-VISMA_SCOPE="vismanet_erp_service_api"
+VISMA_SCOPE="vismanet_erp_service_api:create vismanet_erp_service_api:update"
 VISMA_DEFAULT_CURRENCY="NOK"
 ```
 
-If your Visma Connect application exposes separate read/write scopes (for example `vismanet_erp_service_api:read` and
-`vismanet_erp_service_api:write`), list them space separated in `VISMA_SCOPE`. Leaving the variable empty removes the `scope`
-parameter from the token request entirely, which is useful for legacy tenants that expect the default access.
+The default scope string grants permission to create and update sales orders. If your Visma Connect application exposes
+additional scopes (for example `vismanet_erp_service_api:read` or `vismanet_erp_service_api:write`), list them space separated
+in `VISMA_SCOPE`. Leaving the variable empty removes the `scope` parameter from the token request entirely, which is useful for
+legacy tenants that expect the default access.
 
 After editing the environment file remember to reload PHP-FPM (or the queue worker) so the new variables are picked up.
 
