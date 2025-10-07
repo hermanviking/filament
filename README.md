@@ -1,3 +1,62 @@
+## Filament Order Management
+
+This project extends the default Filament admin panel with Visma.net ERP order synchronisation. You can:
+
+- Create or edit orders in Filament and automatically calculate line discounts based on the Visma discount matrix.
+- Push newly created or updated orders to Visma from the create/edit pages or the list table.
+- Import existing Visma orders by number and keep them aligned via the **Refresh from Visma** action.
+
+See [docs/visma-order-sync.md](docs/visma-order-sync.md) for detailed setup and troubleshooting guidance.
+
+## Deploying to a server
+
+The exact steps depend on your hosting environment, but a typical deployment for a Linux server running PHP 8.2, Nginx/Apache, and MySQL looks like this:
+
+1. **Clone or update the code**
+   ```bash
+   cd /var/www/filament
+   git pull origin work
+   ```
+2. **Install PHP dependencies**
+   ```bash
+   composer install --optimize-autoloader --no-dev
+   ```
+3. **Install and build front-end assets** (if the Filament UI or theme changed)
+   ```bash
+   npm ci
+   npm run build
+   ```
+4. **Set environment variables** by updating `.env` or the hosting control panel with the Visma keys described in [docs/visma-order-sync.md](docs/visma-order-sync.md). Ensure the `VISMA_SCOPE` value includes `vismanet_erp_service_api:create` and `vismanet_erp_service_api:update` so the integration can create and update orders, and configure the database and queue settings for production.
+5. **Configure storage**
+   ```bash
+   php artisan storage:link
+   mkdir -p storage/framework/{cache,sessions,views}
+   mkdir -p storage/logs
+   chown -R www-data:www-data storage bootstrap/cache
+   ```
+6. **Run database migrations**
+   ```bash
+   php artisan migrate --force
+   ```
+7. **Seed or import master data** (products/customers) as needed:
+   ```bash
+   php artisan visma:import-products
+   php artisan visma:import-customers
+   ```
+8. **Cache configuration for performance**
+   ```bash
+   php artisan config:cache
+   php artisan route:cache
+   php artisan view:cache
+   ```
+9. **Restart PHP workers** (FPM and queues) so they pick up the new code and environment variables.
+
+Finally, ensure the `storage/discounts.json` file from Visma is deployed and readable so discount calculations work during order entry.
+
+---
+
+The remainder of this README contains the default Laravel documentation for reference.
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
@@ -6,62 +65,3 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
-
-## About Laravel
-
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
-
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-# filament
