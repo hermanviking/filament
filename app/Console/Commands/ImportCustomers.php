@@ -2,15 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Customer;
 use GuzzleHttp\Client;
-use App\Models\Customer; // Assuming you have a Product model
-use Illuminate\Support\Facades\Http;
-
-
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 
 class ImportCustomers extends Command
 {
+    private const PAGE_SIZE = 500;
 
     /**
      * The name and signature of the console command.
@@ -24,172 +23,173 @@ class ImportCustomers extends Command
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Synchronise customers from Visma.net ERP.';
 
-    private $client;
-    private $accessToken;
+    private Client $client;
+    private ?string $accessToken = null;
 
-    /**
-     * Execute the console command.
-     */
     public function __construct()
     {
         parent::__construct();
-        $this->client = new Client();  // Initialize Guzzle client
+        $this->client = new Client();
     }
 
-    public function handle()
+    public function handle(): int
     {
-        // Get access token
         $this->accessToken = $this->getAccessToken();
+
         if (!$this->accessToken) {
-            return;  // Stop if we couldn't get the access token
+            $this->error('Unable to fetch access token. Aborting import.');
+
+            return self::FAILURE;
         }
 
-        // Define the API URL for fetching products
         $page = 1;
-        $pageSize = 500; // Adjust as needed
-        do {
-            $url = "https://integration.visma.net/API/controller/api/v1/customer?status=Active&pageNumber={$page}&pageSize={$pageSize}
-";
+        $totalImported = 0;
 
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->accessToken,
-                'Content-Type' => 'application/json',
-            ])->get(
-                $url
-            );
+        while (true) {
+            $customers = $this->fetchCustomers($page);
 
-            // Fetch data from Visma API
-            //     try {
-            //       $response = $this->client->get($url, [
-            //         'headers' => [
-            //           'Authorization' => 'Bearer ' . $this->accessToken,
-            //         'Content-Type' => 'application/json',
-            //   ],
-            // ]);
+            if ($customers === null) {
+                return self::FAILURE;
+            }
 
-            // Fetch the response body
-            $responseBody = $response->getBody()->getContents();
-            $test = json_decode($responseBody, true);
-
-            // Display the raw response body in the console
-            //$this->info('Raw API Response:');
-            //$this->info(print_r($test));
-            // } catch (\Exception $e) {
-            //   $this->error('Error fetching products from Visma API: ' . $e->getMessage());
-            // return;
-            // }
-
-            // Check if the request was successful
-            if ($response->getStatusCode() === 200) {
-                $customers = $response->json();
-
-                // Log or print the response to inspect its structure
-
-                // Alternatively, you can use dd() to debug
-                // dd($customers);
-
-                // Now try accessing the products as per the actual structure
-                foreach ($customers as $customerData) {
-                    // Ensure the data contains the address and contact fields, and update or create the customer accordingly
-                    Customer::updateOrCreate(
-                        ['number' => $customerData['number']], // Assuming the 'number' is unique for each customer
-                        [
-                            'name' => $customerData['name'] ?? '',
-
-                            // Main Address Fields
-                            'main_address_line1' => $customerData['mainAddress']['addressLine1'] ?? '',
-                            'main_postal_code' => $customerData['mainAddress']['postalCode'] ?? '',
-                            'main_city' => $customerData['mainAddress']['city'] ?? '',
-                            'main_country' => $customerData['mainAddress']['country']['name'] ?? '',
-                            'main_county' => $customerData['mainAddress']['county']['name'] ?? '',
-
-                            // Invoice Address Fields
-                            'invoice_address_line1' => $customerData['invoiceAddress']['addressLine1'] ?? '',
-                            'invoice_postal_code' => $customerData['invoiceAddress']['postalCode'] ?? '',
-                            'invoice_city' => $customerData['invoiceAddress']['city'] ?? '',
-                            'invoice_country' => $customerData['invoiceAddress']['country']['name'] ?? '',
-                            'invoice_county' => $customerData['invoiceAddress']['county']['name'] ?? '',
-
-                            // Delivery Address Fields
-                            'delivery_address_line1' => $customerData['deliveryAddress']['addressLine1'] ?? '',
-                            'delivery_postal_code' => $customerData['deliveryAddress']['postalCode'] ?? '',
-                            'delivery_city' => $customerData['deliveryAddress']['city'] ?? '',
-                            'delivery_country' => $customerData['deliveryAddress']['country']['name'] ?? '',
-                            'delivery_county' => $customerData['deliveryAddress']['county']['name'] ?? '',
-
-                            // Main Contact Information
-                            'main_contact_name' => $customerData['mainContact']['name'] ?? '',
-                            'main_contact_attention' => $customerData['mainContact']['attention'] ?? '',
-                            'main_contact_email' => $customerData['mainContact']['email'] ?? '',
-                            'main_contact_phone' => $customerData['mainContact']['phone1'] ?? '',
-
-                            // Invoice Contact Information
-                            'invoice_contact_name' => $customerData['invoiceContact']['name'] ?? '',
-                            'invoice_contact_attention' => $customerData['invoiceContact']['attention'] ?? '',
-                            'invoice_contact_email' => $customerData['invoiceContact']['email'] ?? '',
-                            'invoice_contact_phone' => $customerData['invoiceContact']['phone1'] ?? '',
-
-                            // Delivery Contact Information (if you have it, otherwise this section is optional)
-                            'delivery_contact_name' => $customerData['deliveryContact']['name'] ?? '',
-                            'delivery_contact_attention' => $customerData['deliveryContact']['attention'] ?? '',
-                            'delivery_contact_email' => $customerData['deliveryContact']['email'] ?? '',
-                            'delivery_contact_phone' => $customerData['deliveryContact']['phone1'] ?? '',
-                            'customer_price_class_id' => $customerData['priceClass']['id'] ?? '',
-
-                            'corporateId' => $customerData['corporateId'] ?? null,
-
-
-                            // Additional fields like VAT, credit terms, or any other attributes can be added here as necessary
-                            // Example:
-                            // 'credit_terms' => $customerData['creditTerms']['description'] ?? '',
-                            // 'currency' => $customerData['currencyId'] ?? 'NOK',
-                        ]
-                    );
-                }
-                $page++;
-
-
-
-                $this->info('Customers imported successfully from Visma API from page' . $page . 'and url: ' . $url);
-            } else {
-                $this->error('Failed to fetch data from Visma API. Status code: ' . $response->getStatusCode());
+            if (empty($customers)) {
                 break;
             }
-        } while (count($customers) > 0);
+
+            $importedThisPage = 0;
+
+            foreach ($customers as $customerData) {
+                $number = data_get($customerData, 'number');
+
+                if (blank($number)) {
+                    $this->warn('Skipped customer without a number.');
+                    continue;
+                }
+
+                Customer::updateOrCreate(
+                    ['number' => $number],
+                    $this->mapCustomerData($customerData)
+                );
+
+                $importedThisPage++;
+                $totalImported++;
+            }
+
+            $this->info(sprintf('Imported %d customers from page %d.', $importedThisPage, $page));
+
+            if (count($customers) < self::PAGE_SIZE) {
+                break;
+            }
+
+            $page++;
+        }
+
+        $this->info(sprintf('Customer import completed. %d customers synchronised.', $totalImported));
+
+        return self::SUCCESS;
     }
 
-    private function getAccessToken()
+    private function fetchCustomers(int $page): ?array
     {
-        $url = 'https://connect.visma.com/connect/token'; // URL to get the access token
-        $clientId = env('VISMA_CLIENT_ID'); // Set your client ID in .env
-        $clientSecret = env('VISMA_CLIENT_SECRET'); // Set your client secret in .env
-        $tenantId = env('VISMA_TENANT_ID_LIVE'); // Set your tenant ID in .env
+        $response = Http::withToken($this->accessToken)
+            ->acceptJson()
+            ->get('https://integration.visma.net/API/controller/api/v1/customer', [
+                'status' => 'Active',
+                'pageNumber' => $page,
+                'pageSize' => self::PAGE_SIZE,
+            ]);
+
+        if ($response->failed()) {
+            $this->error(sprintf('Failed to fetch customers from Visma (status %d).', $response->status()));
+            $this->error((string) $response->body());
+
+            return null;
+        }
+
+        $payload = $response->json();
+
+        if (isset($payload['data']) && is_array($payload['data'])) {
+            return $payload['data'];
+        }
+
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        $this->error('Unexpected customer payload structure returned from Visma.');
+
+        return null;
+    }
+
+    private function mapCustomerData(array $customerData): array
+    {
+        return [
+            'name' => data_get($customerData, 'name', ''),
+            'corporateId' => data_get($customerData, 'corporateId'),
+            'main_address_line1' => data_get($customerData, 'mainAddress.addressLine1'),
+            'main_postal_code' => data_get($customerData, 'mainAddress.postalCode'),
+            'main_city' => data_get($customerData, 'mainAddress.city'),
+            'main_country' => data_get($customerData, 'mainAddress.country.name'),
+            'main_county' => data_get($customerData, 'mainAddress.county.name'),
+            'invoice_address_line1' => data_get($customerData, 'invoiceAddress.addressLine1'),
+            'invoice_postal_code' => data_get($customerData, 'invoiceAddress.postalCode'),
+            'invoice_city' => data_get($customerData, 'invoiceAddress.city'),
+            'invoice_country' => data_get($customerData, 'invoiceAddress.country.name'),
+            'invoice_county' => data_get($customerData, 'invoiceAddress.county.name'),
+            'delivery_address_line1' => data_get($customerData, 'deliveryAddress.addressLine1'),
+            'delivery_postal_code' => data_get($customerData, 'deliveryAddress.postalCode'),
+            'delivery_city' => data_get($customerData, 'deliveryAddress.city'),
+            'delivery_country' => data_get($customerData, 'deliveryAddress.country.name'),
+            'delivery_county' => data_get($customerData, 'deliveryAddress.county.name'),
+            'main_contact_name' => data_get($customerData, 'mainContact.name'),
+            'main_contact_attention' => data_get($customerData, 'mainContact.attention'),
+            'main_contact_email' => data_get($customerData, 'mainContact.email'),
+            'main_contact_phone' => data_get($customerData, 'mainContact.phone1'),
+            'invoice_contact_name' => data_get($customerData, 'invoiceContact.name'),
+            'invoice_contact_attention' => data_get($customerData, 'invoiceContact.attention'),
+            'invoice_contact_email' => data_get($customerData, 'invoiceContact.email'),
+            'invoice_contact_phone' => data_get($customerData, 'invoiceContact.phone1'),
+            'delivery_contact_name' => data_get($customerData, 'deliveryContact.name'),
+            'delivery_contact_attention' => data_get($customerData, 'deliveryContact.attention'),
+            'delivery_contact_email' => data_get($customerData, 'deliveryContact.email'),
+            'delivery_contact_phone' => data_get($customerData, 'deliveryContact.phone1'),
+            'customer_price_class_id' => data_get($customerData, 'priceClass.id', data_get($customerData, 'priceClassId')),
+        ];
+    }
+
+    private function getAccessToken(): ?string
+    {
+        $url = 'https://connect.visma.com/connect/token';
+        $clientId = env('VISMA_CLIENT_ID');
+        $clientSecret = env('VISMA_CLIENT_SECRET');
+        $tenantId = env('VISMA_TENANT_ID_LIVE');
 
         try {
-            // Get the access token from Visma
             $response = $this->client->post($url, [
                 'form_params' => [
                     'grant_type' => 'client_credentials',
                     'client_id' => $clientId,
                     'client_secret' => $clientSecret,
-                    'scope' => 'vismanet_erp_service_api:read', // Adjust if needed
-                    'tenant_id' => $tenantId // Add tenant_id to the request
+                    'scope' => 'vismanet_erp_service_api:read',
+                    'tenant_id' => $tenantId,
                 ],
             ]);
+        } catch (\Throwable $exception) {
+            $this->error('Error fetching access token: ' . $exception->getMessage());
 
-            $data = json_decode($response->getBody()->getContents(), true);
-
-            if (!isset($data['access_token'])) {
-                $this->error('Error: No access token returned.');
-                return null;  // Return null if access token is not received
-            }
-
-            return $data['access_token'];  // Return the access token if received
-        } catch (\Exception $e) {
-            $this->error('Error fetching access token: ' . $e->getMessage());
-            return null;  // Return null on error
+            return null;
         }
+
+        $data = json_decode($response->getBody()->getContents(), true);
+
+        if (!is_array($data) || !isset($data['access_token'])) {
+            $this->error('Error: No access token returned.');
+
+            return null;
+        }
+
+        return $data['access_token'];
     }
 }
