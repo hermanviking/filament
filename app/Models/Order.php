@@ -20,6 +20,7 @@ class Order extends Model
         'status',
         'customer_price_class_id',
         'visma_sales_order_number',
+        'visma_sales_order_type',
         'visma_status',
         'visma_last_synced_at',
         'visma_payload',

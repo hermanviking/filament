@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Products;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ use Throwable;
 
 class VismaOrderService
 {
-    private const BASE_URL = 'https://integration.visma.net/API/controller/api/v1';
+    private const BASE_URL = 'https://salesorder.visma.net/api/v3';
 
     private ?string $accessToken = null;
 
@@ -50,13 +51,31 @@ class VismaOrderService
             throw new RuntimeException('Orders must contain at least one line before they can be sent to Visma.');
         }
 
+        $orderType = $order->visma_sales_order_type ?? $this->getSalesOrderType();
+
+        if (filled($orderType) && $order->visma_sales_order_type !== $orderType) {
+            $order->visma_sales_order_type = $orderType;
+            $order->save();
+        }
+
+        if (!filled($orderType)) {
+            throw new RuntimeException('A Visma sales order type is required before pushing the order.');
+        }
+
         $payload = $this->buildSalesOrderPayload($order);
         $client = $this->http();
 
         try {
             $response = $order->visma_sales_order_number
-                ? $client->put('/salesorder/' . urlencode($order->visma_sales_order_number), $payload)
-                : $client->post('/salesorder', $payload);
+                ? $client->put(
+                    sprintf(
+                        '/SalesOrders/%s/%s',
+                        urlencode($orderType),
+                        urlencode($order->visma_sales_order_number)
+                    ),
+                    $payload
+                )
+                : $client->post('/SalesOrders', $payload);
         } catch (Throwable $exception) {
             Log::error('Unexpected error while communicating with Visma.', [
                 'order_id' => $order->id,
@@ -82,8 +101,9 @@ class VismaOrderService
         }
 
         $responseBody = $response->json();
-        $vismaOrderNumber = data_get($responseBody, 'orderNo')
+        $vismaOrderNumber = data_get($responseBody, 'orderId')
             ?? data_get($responseBody, 'orderNumber')
+            ?? data_get($responseBody, 'orderNo')
             ?? $order->visma_sales_order_number;
 
         if (!filled($vismaOrderNumber)) {
@@ -95,13 +115,17 @@ class VismaOrderService
 
     protected function storeVismaOrderPayload(array $payload): Order
     {
-        $orderNumber = data_get($payload, 'orderNo') ?? data_get($payload, 'orderNumber');
-        $status = data_get($payload, 'status');
+        $orderNumber = data_get($payload, 'orderId')
+            ?? data_get($payload, 'orderNumber')
+            ?? data_get($payload, 'orderNo');
+        $status = data_get($payload, 'status.description') ?? data_get($payload, 'status');
         $totals = data_get($payload, 'totals', []);
-        $details = data_get($payload, 'details', []);
-        $billingAddress = data_get($payload, 'billingAddress', []);
-        $shippingAddress = data_get($payload, 'shippingAddress', []);
-        $customerNumber = data_get($payload, 'customer.customerNo') ?? data_get($payload, 'customerNo');
+        $details = data_get($payload, 'orderLines', data_get($payload, 'details', []));
+        $billingAddress = data_get($payload, 'billing.address', data_get($payload, 'billingAddress', []));
+        $shippingAddress = data_get($payload, 'shipping.address', data_get($payload, 'shippingAddress', []));
+        $customerNumber = data_get($payload, 'customer.id')
+            ?? data_get($payload, 'customer.customerNo')
+            ?? data_get($payload, 'customerNo');
         $customerName = data_get($payload, 'customer.name') ?? data_get($payload, 'customerName');
 
         if (!filled($customerNumber)) {
@@ -117,15 +141,16 @@ class VismaOrderService
         $orderAttributes = collect([
             'customer_id' => $customer->id,
             'customer_price_class_id' => $customer->customer_price_class_id,
-            'invoice_address' => data_get($billingAddress, 'addressLine1'),
+            'invoice_address' => data_get($billingAddress, 'line1') ?? data_get($billingAddress, 'addressLine1'),
             'invoice_city' => data_get($billingAddress, 'city'),
             'invoice_postal_code' => data_get($billingAddress, 'postalCode'),
-            'delivery_address' => data_get($shippingAddress, 'addressLine1'),
+            'delivery_address' => data_get($shippingAddress, 'line1') ?? data_get($shippingAddress, 'addressLine1'),
             'delivery_city' => data_get($shippingAddress, 'city'),
             'delivery_postal_code' => data_get($shippingAddress, 'postalCode'),
             'status' => $status ?: 'pending',
             'total_amount' => data_get($totals, 'orderTotal') ?? data_get($payload, 'orderTotal'),
             'visma_sales_order_number' => $orderNumber,
+            'visma_sales_order_type' => data_get($payload, 'type') ?? data_get($payload, 'orderType'),
             'visma_status' => $status,
             'visma_last_synced_at' => Carbon::now(),
             'visma_payload' => $payload,
@@ -152,7 +177,7 @@ class VismaOrderService
         $existingItemIds = [];
 
         foreach ($details as $detail) {
-            $inventoryId = data_get($detail, 'inventoryId');
+            $inventoryId = data_get($detail, 'inventoryId') ?? data_get($detail, 'inventory.id');
 
             if (!filled($inventoryId)) {
                 continue;
@@ -172,10 +197,10 @@ class VismaOrderService
 
             $quantity = (float) data_get($detail, 'quantity', 1);
             $unitPrice = (float) data_get($detail, 'unitPrice', 0);
-            $discountPercent = (float) data_get($detail, 'discPct', 0);
+            $discountPercent = (float) (data_get($detail, 'discountPercent') ?? data_get($detail, 'discPct', 0));
             $discountAmount = (float) data_get($detail, 'discountAmount', 0);
-            $lineTotal = (float) data_get($detail, 'lineTotal', 0);
-            $lineNumber = data_get($detail, 'lineNbr');
+            $lineTotal = (float) data_get($detail, 'extendedPrice', data_get($detail, 'lineTotal', 0));
+            $lineNumber = data_get($detail, 'lineId') ?? data_get($detail, 'lineNbr');
 
             $discountedUnitPrice = $unitPrice;
 
@@ -225,6 +250,7 @@ class VismaOrderService
     protected function buildSalesOrderPayload(Order $order): array
     {
         $details = [];
+        $orderType = $order->visma_sales_order_type ?? $this->getSalesOrderType();
 
         foreach ($order->items as $index => $item) {
             $product = $item->product;
@@ -240,14 +266,16 @@ class VismaOrderService
             }
 
             $line = [
-                'lineNbr' => $item->visma_line_number ?? ($index + 1),
-                'inventoryId' => $inventoryId,
+                'lineId' => $item->visma_line_number ?? ($index + 1),
+                'inventory' => [
+                    'id' => $inventoryId,
+                ],
                 'quantity' => (float) $item->quantity,
                 'unitPrice' => (float) $item->price,
             ];
 
             if ($item->discount_percent) {
-                $line['discPct'] = (float) $item->discount_percent;
+                $line['discountPercent'] = (float) $item->discount_percent;
             }
 
             if ($item->discount_amount) {
@@ -258,43 +286,91 @@ class VismaOrderService
         }
 
         $payload = [
-            'orderNo' => $order->visma_sales_order_number,
-            'orderDate' => optional($order->created_at)->format('Y-m-d') ?? Carbon::now()->format('Y-m-d'),
-            'status' => $order->status,
+            'orderId' => $order->visma_sales_order_number,
+            'type' => $orderType,
+            'date' => optional($order->created_at)->format('Y-m-d') ?? Carbon::now()->format('Y-m-d'),
             'customer' => [
-                'customerNo' => $order->customer->number,
+                'id' => $order->customer->number,
             ],
-            'details' => $details,
-            'billingAddress' => array_filter([
-                'addressLine1' => $order->invoice_address,
-                'postalCode' => $order->invoice_postal_code,
-                'city' => $order->invoice_city,
-            ], fn ($value) => filled($value)),
-            'shippingAddress' => array_filter([
-                'addressLine1' => $order->delivery_address,
-                'postalCode' => $order->delivery_postal_code,
-                'city' => $order->delivery_city,
-            ], fn ($value) => filled($value)),
+            'orderLines' => $details,
+            'billing' => [],
+            'shipping' => [],
             'currencyId' => env('VISMA_DEFAULT_CURRENCY', 'NOK'),
         ];
+
+        $billingAddress = array_filter([
+            'line1' => $order->invoice_address,
+            'postalCode' => $order->invoice_postal_code,
+            'city' => $order->invoice_city,
+        ], fn ($value) => filled($value));
+
+        if ($billingAddress !== []) {
+            $payload['billing']['address'] = $billingAddress;
+        }
+
+        $shippingAddress = array_filter([
+            'line1' => $order->delivery_address,
+            'postalCode' => $order->delivery_postal_code,
+            'city' => $order->delivery_city,
+        ], fn ($value) => filled($value));
+
+        if ($shippingAddress !== []) {
+            $payload['shipping']['address'] = $shippingAddress;
+        }
+
+        if ($payload['billing'] === []) {
+            unset($payload['billing']);
+        }
+
+        if ($payload['shipping'] === []) {
+            unset($payload['shipping']);
+        }
+
+        $version = data_get($order->visma_payload, 'version');
+        if (filled($version)) {
+            $payload['version'] = $version;
+        }
 
         return Arr::where($payload, fn ($value) => !is_null($value));
     }
 
     protected function fetchOrderPayload(string $orderNumber): array
     {
-        $response = $this->http()->get('/salesorder/' . urlencode($orderNumber));
+        $orderType = $this->resolveSalesOrderType($orderNumber);
+        $attemptedOrderType = $orderType;
+        $response = $this->requestSalesOrder($orderNumber, $orderType);
+
+        if ($response->status() === 404 && filled($orderType)) {
+            $response = $this->requestSalesOrder($orderNumber, null);
+
+            if ($response->successful()) {
+                $attemptedOrderType = null;
+            }
+        }
 
         if ($response->failed()) {
+            $details = sprintf('HTTP %d: %s', $response->status(), (string) $response->body());
+
+            if (filled($attemptedOrderType)) {
+                $details .= sprintf(' (type=%s)', $attemptedOrderType);
+            }
+
             throw new RuntimeException(sprintf(
-                'Failed to retrieve Visma order "%s" (HTTP %d): %s',
+                'Failed to retrieve Visma order "%s": %s',
                 $orderNumber,
-                $response->status(),
-                (string) $response->body()
+                $details
             ));
         }
 
         $payload = $response->json();
+
+        if (is_array($payload) && array_key_exists('value', $payload)) {
+            $first = $payload['value'][0] ?? [];
+
+            if ($first !== []) {
+                $payload = $first;
+            }
+        }
 
         if (!is_array($payload)) {
             throw new RuntimeException('Visma returned an unexpected response when fetching the order.');
@@ -308,6 +384,72 @@ class VismaOrderService
         return Http::withToken($this->getAccessToken())
             ->acceptJson()
             ->baseUrl(self::BASE_URL);
+    }
+
+    protected function resolveSalesOrderType(string $orderNumber): ?string
+    {
+        $storedType = Order::query()
+            ->where('visma_sales_order_number', $orderNumber)
+            ->value('visma_sales_order_type');
+
+        if (filled($storedType)) {
+            return $storedType;
+        }
+
+        return $this->getSalesOrderType();
+    }
+
+    protected function requestSalesOrder(string $orderNumber, ?string $orderType): Response
+    {
+        $query = [
+            'expand' => implode(',', [
+                'Billing',
+                'Payment',
+                'FinancialInformation',
+                'Shipping',
+                'Customer',
+                'Origin',
+                'Note',
+                'Discounts',
+                'Payments',
+                'Lines',
+                'LinesExcludingAllocations',
+            ]),
+        ];
+
+        if (filled($orderType)) {
+            return $this->http()->get(
+                sprintf('/SalesOrders/%s/%s', urlencode($orderType), urlencode($orderNumber)),
+                $query
+            );
+        }
+
+        $response = $this->http()->get(sprintf('/SalesOrders/%s', urlencode($orderNumber)), $query);
+
+        if ($response->status() !== 404) {
+            return $response;
+        }
+
+        return $this->http()->get(
+            '/SalesOrders',
+            array_merge($query, [
+                'orderId' => $orderNumber,
+                'pageSize' => 1,
+            ])
+        );
+    }
+
+    protected function getSalesOrderType(): ?string
+    {
+        $orderType = env('VISMA_SALES_ORDER_TYPE', 'SO');
+
+        if (!is_string($orderType)) {
+            return null;
+        }
+
+        $orderType = trim($orderType);
+
+        return $orderType !== '' ? $orderType : null;
     }
 
     protected function getAccessToken(): string
