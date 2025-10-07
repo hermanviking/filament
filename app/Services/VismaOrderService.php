@@ -418,6 +418,30 @@ class VismaOrderService
                 ['expand' => $expands]
             )
         );
+        $query = [
+            'expand' => implode(',', [
+                'Billing',
+                'Payment',
+                'FinancialInformation',
+                'Shipping',
+                'Customer',
+                'Origin',
+                'Note',
+                'Discounts',
+                'Payments',
+                'Lines',
+                'LinesExcludingAllocations',
+            ]),
+        ];
+
+        if (filled($orderType)) {
+            return $this->http()->get(
+                sprintf('/SalesOrders/%s/%s', urlencode($orderType), urlencode($orderNumber)),
+                $query
+            );
+        }
+
+        $response = $this->http()->get(sprintf('/SalesOrders/%s', urlencode($orderNumber)), $query);
 
         if ($response->status() !== 404) {
             return $response;
@@ -507,6 +531,14 @@ class VismaOrderService
             'Lines',
             'LinesExcludingAllocations',
         ];
+    }
+
+            '/SalesOrders',
+            array_merge($query, [
+                'orderId' => $orderNumber,
+                'pageSize' => 1,
+            ])
+        );
     }
 
     protected function getSalesOrderType(): ?string

@@ -17,3 +17,12 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+/laravel.log
+/laravel/logs
+/storage/app/public
+/storage/debugbar
+/storage/*.sqlite
+/storage/*.sqlite3
+/storage/framework/cache/data
+/storage/framework/sessions
+/storage/framework/views                
