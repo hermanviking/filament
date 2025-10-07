@@ -401,6 +401,23 @@ class VismaOrderService
 
     protected function requestSalesOrder(string $orderNumber, ?string $orderType): Response
     {
+        $expands = $this->getExpandParameters();
+
+        if (filled($orderType)) {
+            return $this->http()->get(
+                $this->appendQueryString(
+                    sprintf('/SalesOrders/%s/%s', urlencode($orderType), urlencode($orderNumber)),
+                    ['expand' => $expands]
+                )
+            );
+        }
+
+        $response = $this->http()->get(
+            $this->appendQueryString(
+                sprintf('/SalesOrders/%s', urlencode($orderNumber)),
+                ['expand' => $expands]
+            )
+        );
         $query = [
             'expand' => implode(',', [
                 'Billing',
@@ -431,6 +448,91 @@ class VismaOrderService
         }
 
         return $this->http()->get(
+            $this->appendQueryString(
+                '/SalesOrders',
+                [
+                    'expand' => $expands,
+                    'orderId' => $orderNumber,
+                    'pageSize' => 1,
+                ]
+            )
+        );
+    }
+
+    protected function appendQueryString(string $path, array $parameters = []): string
+    {
+        $query = $this->buildQueryString($parameters);
+
+        if ($query === '') {
+            return $path;
+        }
+
+        return $path . (str_contains($path, '?') ? '&' : '?') . $query;
+    }
+
+    protected function buildQueryString(array $parameters): string
+    {
+        $parts = [];
+
+        foreach ($parameters as $key => $value) {
+            if (is_null($value)) {
+                continue;
+            }
+
+            if ($key === 'expand') {
+                foreach ($this->normaliseExpandValues($value) as $expand) {
+                    $parts[] = 'expand=' . rawurlencode($expand);
+                }
+
+                continue;
+            }
+
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if (is_null($item)) {
+                        continue;
+                    }
+
+                    $parts[] = sprintf('%s=%s', rawurlencode($key), rawurlencode((string) $item));
+                }
+
+                continue;
+            }
+
+            $parts[] = sprintf('%s=%s', rawurlencode($key), rawurlencode((string) $value));
+        }
+
+        return implode('&', $parts);
+    }
+
+    /**
+     * @param  array|string  $value
+     * @return array<int, string>
+     */
+    protected function normaliseExpandValues(array|string $value): array
+    {
+        $values = is_array($value) ? $value : explode(',', (string) $value);
+
+        return array_values(array_filter(array_map('trim', $values), fn ($expand) => $expand !== ''));
+    }
+
+    protected function getExpandParameters(): array
+    {
+        return [
+            'Billing',
+            'Payment',
+            'FinancialInformation',
+            'Shipping',
+            'Customer',
+            'Origin',
+            'Note',
+            'Discounts',
+            'Payments',
+            'Lines',
+            'LinesExcludingAllocations',
+        ];
+    }
+
             '/SalesOrders',
             array_merge($query, [
                 'orderId' => $orderNumber,
