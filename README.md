@@ -26,7 +26,11 @@ The exact steps depend on your hosting environment, but a typical deployment for
    npm ci
    npm run build
    ```
+<<<<<<< ours
 4. **Set environment variables** by updating `.env` or the hosting control panel with the Visma keys described in [docs/visma-order-sync.md](docs/visma-order-sync.md). Ensure the `VISMA_SCOPE` value includes `vismanet_erp_service_api:create` and `vismanet_erp_service_api:update` so the integration can create and update orders, configure `VISMA_SALES_ORDER_TYPE` to the Visma document type segment used in the Sales Order API path (default `SO`), and configure the database and queue settings for production.
+=======
+4. **Set environment variables** by updating `.env` or the hosting control panel with the Visma keys described in [docs/visma-order-sync.md](docs/visma-order-sync.md). Ensure the `VISMA_SCOPE` value includes `vismanet_erp_service_api:create` and `vismanet_erp_service_api:update` so the integration can create and update orders, configure `VISMA_SALES_ORDER_TYPE` to the Visma document type segment used in the Sales Order API path (default `SO`), and provide the optional Sales Order API headers such as `VISMA_COMPANY_ID`, `VISMA_APPLICATION_TYPE`, `VISMA_USER_ID`, and `VISMA_SUBSCRIPTION_KEY` when your tenant requires them. Configure the database and queue settings for production.
+>>>>>>> theirs
 5. **Configure storage**
    ```bash
    php artisan storage:link

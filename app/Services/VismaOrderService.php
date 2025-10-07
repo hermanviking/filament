@@ -381,9 +381,28 @@ class VismaOrderService
 
     protected function http(): PendingRequest
     {
+<<<<<<< ours
         return Http::withToken($this->getAccessToken())
             ->acceptJson()
             ->baseUrl(self::BASE_URL);
+=======
+        $client = Http::withToken($this->getAccessToken())
+            ->acceptJson()
+            ->baseUrl(self::BASE_URL);
+
+        $headers = array_filter([
+            'ipp-company-id' => env('VISMA_COMPANY_ID'),
+            'ipp-application-type' => env('VISMA_APPLICATION_TYPE'),
+            'ipp-user-id' => env('VISMA_USER_ID'),
+            'Ocp-Apim-Subscription-Key' => env('VISMA_SUBSCRIPTION_KEY'),
+        ], fn ($value) => filled($value));
+
+        if ($headers !== []) {
+            $client = $client->withHeaders($headers);
+        }
+
+        return $client;
+>>>>>>> theirs
     }
 
     protected function resolveSalesOrderType(string $orderNumber): ?string
@@ -418,6 +437,7 @@ class VismaOrderService
                 ['expand' => $expands]
             )
         );
+<<<<<<< ours
         $query = [
             'expand' => implode(',', [
                 'Billing',
@@ -442,6 +462,8 @@ class VismaOrderService
         }
 
         $response = $this->http()->get(sprintf('/SalesOrders/%s', urlencode($orderNumber)), $query);
+=======
+>>>>>>> theirs
 
         if ($response->status() !== 404) {
             return $response;
@@ -533,6 +555,7 @@ class VismaOrderService
         ];
     }
 
+<<<<<<< ours
             '/SalesOrders',
             array_merge($query, [
                 'orderId' => $orderNumber,
@@ -541,6 +564,8 @@ class VismaOrderService
         );
     }
 
+=======
+>>>>>>> theirs
     protected function getSalesOrderType(): ?string
     {
         $orderType = env('VISMA_SALES_ORDER_TYPE', 'SO');

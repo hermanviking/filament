@@ -22,6 +22,13 @@ VISMA_TENANT_ID_LIVE="your-live-tenant-id" # optional fallback if you use a sepa
 VISMA_SCOPE="vismanet_erp_service_api:create vismanet_erp_service_api:update"
 VISMA_DEFAULT_CURRENCY="NOK"
 VISMA_SALES_ORDER_TYPE="SO" # Visma document type for sales orders
+<<<<<<< ours
+=======
+VISMA_COMPANY_ID="your-company-guid" # optional: sent as ipp-company-id for Sales Order API calls
+VISMA_APPLICATION_TYPE="Visma.net ERP" # optional: overrides the ipp-application-type header when required
+VISMA_USER_ID="your-service-user" # optional: identifies the user in ipp-user-id header
+VISMA_SUBSCRIPTION_KEY="your-api-management-key" # optional: Ocp-Apim-Subscription-Key header when provided by Visma
+>>>>>>> theirs
 ```
 
 The default scope string grants permission to create and update sales orders. If your Visma Connect application exposes
@@ -32,7 +39,13 @@ legacy tenants that expect the default access.
 `VISMA_SALES_ORDER_TYPE` controls the Visma document type segment that is sent with order create/update requests and used when
 retrieving existing orders. The Sales Order API expects requests in the form `/SalesOrders/{type}/{orderId}`; configure the
 type (for example `SO`, `BB`, etc.) so the integration can resolve the correct endpoint and avoid 404 "Document could not be
+<<<<<<< ours
 found" errors during syncs.
+=======
+found" errors during syncs. Some tenants also require additional headers (for example `ipp-company-id` or an
+`Ocp-Apim-Subscription-Key`). When that happens, populate the matching environment variables so the integration sends the
+values with every request.
+>>>>>>> theirs
 
 After editing the environment file remember to reload PHP-FPM (or the queue worker) so the new variables are picked up.
 
