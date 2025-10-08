@@ -463,3 +463,30 @@
 #62 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/public/index.php(51): Illuminate\\Foundation\\Http\\Kernel->handle()
 #63 {main}
 "} 
+[2025-10-08 16:44:43] local.ERROR: There are no commands defined in the "visma" namespace. {"exception":"[object] (Symfony\\Component\\Console\\Exception\\NamespaceNotFoundException(code: 0): There are no commands defined in the \"visma\" namespace. at /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php:669)
+[stacktrace]
+#0 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(720): Symfony\\Component\\Console\\Application->findNamespace()
+#1 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(266): Symfony\\Component\\Console\\Application->find()
+#2 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(175): Symfony\\Component\\Console\\Application->doRun()
+#3 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(201): Symfony\\Component\\Console\\Application->run()
+#4 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
+#5 {main}
+"} 
+[2025-10-08 16:44:44] local.ERROR: There are no commands defined in the "visma" namespace. {"exception":"[object] (Symfony\\Component\\Console\\Exception\\NamespaceNotFoundException(code: 0): There are no commands defined in the \"visma\" namespace. at /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php:669)
+[stacktrace]
+#0 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(720): Symfony\\Component\\Console\\Application->findNamespace()
+#1 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(266): Symfony\\Component\\Console\\Application->find()
+#2 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(175): Symfony\\Component\\Console\\Application->doRun()
+#3 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(201): Symfony\\Component\\Console\\Application->run()
+#4 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
+#5 {main}
+"} 
+[2025-10-08 16:44:54] local.ERROR: There are no commands defined in the "visma" namespace. {"exception":"[object] (Symfony\\Component\\Console\\Exception\\NamespaceNotFoundException(code: 0): There are no commands defined in the \"visma\" namespace. at /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php:669)
+[stacktrace]
+#0 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(720): Symfony\\Component\\Console\\Application->findNamespace()
+#1 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(266): Symfony\\Component\\Console\\Application->find()
+#2 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/symfony/console/Application.php(175): Symfony\\Component\\Console\\Application->doRun()
+#3 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(201): Symfony\\Component\\Console\\Application->run()
+#4 /home/1444943.cloudwaysapps.com/bxuwkykpkp/public_html/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle()
+#5 {main}
+"} 
