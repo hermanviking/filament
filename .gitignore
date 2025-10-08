@@ -1,35 +1,85 @@
-/.phpunit.cache
-/node_modules
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
+# ===========================================
+# Laravel Core
+# ===========================================
 /vendor
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# Logs and debug files
+/node_modules
+/public/storage
+/storage/app/public
 /storage/logs
 /storage/*.log
+/storage/*.key
 /storage/debugbar
-/storage/*.sqlite*
-npm-debug.log
-yarn-error.log
-/.fleet
-/.idea
-/.vscode
-
-# Framework storage
-/storage/app/public
 /storage/framework/cache/data
 /storage/framework/sessions
 /storage/framework/views
 
-# Homestead / Laravel specific
+# ===========================================
+# Environment & Config Files
+# ===========================================
+.env
+.env.*
+!.env.example
+auth.json
 Homestead.json
 Homestead.yaml
-auth.json
+
+# ===========================================
+# Build / Frontend
+# ===========================================
+/public/hot
+/public/build
+/.vite
+/.vite/deps
+/vite.config.*
+/pnpm-lock.yaml
+/yarn.lock
+/package-lock.json
+
+# ===========================================
+# PHPUnit / Testing
+# ===========================================
 .phpunit.result.cache
+/.phpunit.cache
+/tests/coverage
+
+# ===========================================
+# IDE / Editor
+# ===========================================
+/.idea
+/.vscode
+/.fleet
+
+# ===========================================
+# Logs, Cache & Temporary
+# ===========================================
+npm-debug.log*
+yarn-error.log*
+composer.lock
+/storage/*.sqlite*
+/storage/*.sqlite3
+/.DS_Store
+Thumbs.db
+
+# ===========================================
+# Filament specific
+# ===========================================
+# Filament will cache views, configs, and icons during build.
+/bootstrap/cache
+/public/vendor/filament
+/public/vendor/livewire
+/public/vendor/alpinejs
+/public/vendor/tinymce
+/public/vendor/ckeditor
+/public/vendor/flatpickr
+/public/vendor/chartjs
+/public/vendor/apexcharts
+
+# If you use Filament Shields or custom plugin builds:
+/public/vendor/filament-shield
+/public/vendor/filament-icons
+/public/vendor/filament-theme
+
+# ===========================================
+# Optional (useful in production environments)
+# ===========================================
+/storage/app/backups
