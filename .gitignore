@@ -5,24 +5,31 @@
 /public/storage
 /storage/*.key
 /vendor
+
+# Environment files
 .env
-.env.backup
-.env.production
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
-auth.json
+.env.*
+!.env.example
+
+# Logs and debug files
+/storage/logs
+/storage/*.log
+/storage/debugbar
+/storage/*.sqlite*
 npm-debug.log
 yarn-error.log
 /.fleet
 /.idea
 /.vscode
-/laravel.log
-/laravel/logs
+
+# Framework storage
 /storage/app/public
-/storage/debugbar
-/storage/*.sqlite
-/storage/*.sqlite3
 /storage/framework/cache/data
 /storage/framework/sessions
-/storage/framework/views                
+/storage/framework/views
+
+# Homestead / Laravel specific
+Homestead.json
+Homestead.yaml
+auth.json
+.phpunit.result.cache
