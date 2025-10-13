@@ -5,289 +5,320 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Models\Customer;
 use Filament\Forms;
+use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Forms\Components\Card;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\Action;
-use Illuminate\Support\Facades\Artisan;
-use Filament\Facades\Filament; // Correct import for Filament facade
-use Filament\Notifications\Notification;
 
 class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
-
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static ?string $navigationGroup = 'CRM';
     protected static ?string $navigationLabel = 'Customers';
-    protected static ?string $navigationGroup = 'Customer Management';
 
-    // Define the form layout
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Form $form): Form
     {
         return $form
+            ->columns(1)
             ->schema([
-                self::generalInformationSection(),
-                self::mainAddressSection(),
-                self::invoiceAddressSection(),
-                self::deliveryAddressSection(),
-                self::mainContactSection(),
-                self::invoiceContactSection(),
-                self::deliveryContactSection(),
+                Forms\Components\Tabs::make('Customer')
+                    ->tabs([
+                        Forms\Components\Tabs\Tab::make('Core')->schema([
+                            Forms\Components\TextInput::make('number')->required()->unique(ignoreRecord: true),
+                            Forms\Components\TextInput::make('name')->required()->columnSpanFull(),
+                            Forms\Components\TextInput::make('corporateId')->label('Org nr'),
+                            Forms\Components\Select::make('status')->options([
+                                'Active' => 'Active',
+                                'Inactive' => 'Inactive',
+                            ])->nullable(),
+                            Forms\Components\TextInput::make('language_id')->label('Language'),
+                            Forms\Components\TextInput::make('currency_id')->label('Currency'),
+                            Forms\Components\TextInput::make('sales_person_id')->label('Salesperson'),
+                            Forms\Components\TextInput::make('branch_id')->label('Branch'),
+                            Forms\Components\TextInput::make('default_location_id')->label('Default location'),
+                        ])->columns(4),
+
+                        Forms\Components\Tabs\Tab::make('Classes & Meta')->schema([
+                            Forms\Components\TextInput::make('customer_class_id')->label('Customer class'),
+                            Forms\Components\TextInput::make('customer_class_description')->columnSpanFull(),
+                            Forms\Components\TextInput::make('price_class_id')->label('Price class'),
+                            Forms\Components\TextInput::make('price_class_description')->columnSpanFull(),
+                        ])->columns(2),
+
+                        Forms\Components\Tabs\Tab::make('Finance')->schema([
+                            Forms\Components\Toggle::make('credit_hold'),
+                            Forms\Components\TextInput::make('credit_limit')->numeric(),
+                            Forms\Components\TextInput::make('balance')->numeric()->disabled(),
+                            Forms\Components\TextInput::make('overdue_balance')->numeric()->disabled(),
+                            Forms\Components\TextInput::make('terms_id')->label('Terms'),
+                            Forms\Components\TextInput::make('payment_method_id')->label('Payment method'),
+                            Forms\Components\TextInput::make('cash_discount_id')->label('Cash discount'),
+                        ])->columns(3),
+
+                        Forms\Components\Tabs\Tab::make('Tax & VAT')->schema([
+                            Forms\Components\TextInput::make('tax_zone_id')->label('Tax zone'),
+                            Forms\Components\TextInput::make('vat_code_id')->label('VAT code'),
+                            Forms\Components\TextInput::make('vat_registration_id')->label('VAT registration id'),
+                            Forms\Components\Toggle::make('vat_exempt')->inline(false),
+                        ])->columns(3),
+
+                        Forms\Components\Tabs\Tab::make('Shipping')->schema([
+                            Forms\Components\TextInput::make('ship_via_id')->label('Ship via'),
+                            Forms\Components\TextInput::make('delivery_terms_id')->label('Delivery terms'),
+                        ])->columns(2),
+
+                        Forms\Components\Tabs\Tab::make('E-invoice / EDI')->schema([
+                            Forms\Components\TextInput::make('einvoice_participant_id')->label('Participant ID'),
+                            Forms\Components\TextInput::make('einvoice_address')->label('E-invoice address'),
+                            Forms\Components\TextInput::make('einvoice_operator')->label('Operator'),
+                            Forms\Components\TextInput::make('edoc_email')->email()->label('eDoc Email'),
+                            Forms\Components\Toggle::make('edoc_enabled')->label('eDoc enabled'),
+                        ])->columns(3),
+
+                        Forms\Components\Tabs\Tab::make('Addresses')->schema([
+                            Forms\Components\Fieldset::make('Main')->schema([
+                                Forms\Components\TextInput::make('main_address_line1'),
+                                Forms\Components\TextInput::make('main_address_line2'),
+                                Forms\Components\TextInput::make('main_postal_code'),
+                                Forms\Components\TextInput::make('main_city'),
+                                Forms\Components\TextInput::make('main_country'),
+                            ])->columns(5),
+                            Forms\Components\Fieldset::make('Invoice')->schema([
+                                Forms\Components\TextInput::make('invoice_address_line1'),
+                                Forms\Components\TextInput::make('invoice_address_line2'),
+                                Forms\Components\TextInput::make('invoice_postal_code'),
+                                Forms\Components\TextInput::make('invoice_city'),
+                                Forms\Components\TextInput::make('invoice_country'),
+                            ])->columns(5),
+                            Forms\Components\Fieldset::make('Delivery')->schema([
+                                Forms\Components\TextInput::make('delivery_address_line1'),
+                                Forms\Components\TextInput::make('delivery_address_line2'),
+                                Forms\Components\TextInput::make('delivery_postal_code'),
+                                Forms\Components\TextInput::make('delivery_city'),
+                                Forms\Components\TextInput::make('delivery_country'),
+                            ])->columns(5),
+                        ])->columns(1),
+
+                        Forms\Components\Tabs\Tab::make('Contacts')->schema([
+                            Forms\Components\Fieldset::make('Main')->schema([
+                                Forms\Components\TextInput::make('main_contact_name'),
+                                Forms\Components\TextInput::make('main_contact_attention'),
+                                Forms\Components\TextInput::make('main_contact_email')->email(),
+                                Forms\Components\TextInput::make('main_contact_phone'),
+                                Forms\Components\TextInput::make('main_contact_phone2'),
+                            ])->columns(5),
+                            Forms\Components\Fieldset::make('Invoice')->schema([
+                                Forms\Components\TextInput::make('invoice_contact_name'),
+                                Forms\Components\TextInput::make('invoice_contact_attention'),
+                                Forms\Components\TextInput::make('invoice_contact_email')->email(),
+                                Forms\Components\TextInput::make('invoice_contact_phone'),
+                            ])->columns(4),
+                            Forms\Components\Fieldset::make('Delivery')->schema([
+                                Forms\Components\TextInput::make('delivery_contact_name'),
+                                Forms\Components\TextInput::make('delivery_contact_attention'),
+                                Forms\Components\TextInput::make('delivery_contact_email')->email(),
+                                Forms\Components\TextInput::make('delivery_contact_phone'),
+                            ])->columns(4),
+                        ])->columns(1),
+
+                        Forms\Components\Tabs\Tab::make('Raw JSON (read-only)')
+                            ->columns(2)
+                            ->schema([
+                                Forms\Components\Textarea::make('payment_settings')
+                                    ->label('Payment settings')
+                                    ->rows(8)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled()
+                                    ->columnSpanFull(),
+
+                                Forms\Components\Textarea::make('financial_information')
+                                    ->label('Financial information')
+                                    ->rows(8)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled()
+                                    ->columnSpanFull(),
+
+
+                                Forms\Components\KeyValue::make('attributes_data')
+                                    ->label('Attributes data')
+                                    ->formatStateUsing(static function ($state) {
+                                        if (!is_array($state)) return [];
+                                        if (array_is_list($state)) {               // list of {id,value}
+                                            $flat = [];
+                                            foreach ($state as $row) {
+                                                $k = data_get($row, 'id');
+                                                $v = data_get($row, 'value');
+                                                if ($k !== null) {
+                                                    $flat[(string) $k] = is_scalar($v)
+                                                        ? (string) $v
+                                                        : json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                                                }
+                                            }
+                                            return $flat;
+                                        }
+                                        return $state; // already a map
+                                    })
+                                    ->disableAddingRows()
+                                    ->disableEditingKeys()
+                                    ->disableEditingValues()
+                                    ->disableDeletingRows()
+
+                                    ->dehydrated(false),   // <- don’t save the flattened view back
+
+
+                                Forms\Components\Textarea::make('main_address_json')
+                                    ->label('Main address json')
+                                    ->rows(6)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled(),
+
+                                Forms\Components\Textarea::make('invoice_address_json')
+                                    ->label('Invoice address json')
+                                    ->rows(6)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled(),
+
+                                Forms\Components\Textarea::make('delivery_address_json')
+                                    ->label('Delivery address json')
+                                    ->rows(6)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled(),
+
+                                Forms\Components\Textarea::make('main_contact_json')
+                                    ->label('Main contact json')
+                                    ->rows(6)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled(),
+
+                                Forms\Components\Textarea::make('invoice_contact_json')
+                                    ->label('Invoice contact json')
+                                    ->rows(6)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled(),
+
+                                Forms\Components\Textarea::make('delivery_contact_json')
+                                    ->label('Delivery contact json')
+                                    ->rows(6)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled(),
+
+                                Forms\Components\KeyValue::make('custom_fields')
+                                    ->label('Custom fields')
+                                    ->formatStateUsing(static function ($state) {
+                                        if (!is_array($state)) return [];
+                                        if (array_is_list($state)) {
+                                            $flat = [];
+                                            foreach ($state as $row) {
+                                                $k = data_get($row, 'id', data_get($row, 'name'));
+                                                $v = data_get($row, 'value', data_get($row, 'name'));
+                                                if ($k !== null) {
+                                                    $flat[(string) $k] = is_scalar($v)
+                                                        ? (string) $v
+                                                        : json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                                                }
+                                            }
+                                            return $flat;
+                                        }
+                                        return $state;
+                                    })
+                                    ->disableAddingRows()
+                                    ->disableEditingKeys()
+                                    ->disableEditingValues()
+                                    ->disableDeletingRows()
+                                    ->dehydrated(false),
+
+
+                                Forms\Components\Textarea::make('raw_payload')
+                                    ->label('Raw payload')
+                                    ->rows(12)
+                                    ->formatStateUsing(
+                                        static fn($state) => $state
+                                            ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                            : ''
+                                    )
+                                    ->dehydrated(false)
+                                    ->disabled()
+                            ])
+                            ->columns(2),
+                    ])
+                    ->persistTabInQueryString()
+                    ->columnSpan(1),
+
             ]);
     }
 
-    // General Information Section
-    private static function generalInformationSection(): Card
-    {
-        return Card::make()
-            ->schema([
-                TextInput::make('number')
-                    ->label('Customer Number')
-                    ->required()
-                    ->unique(Customer::class, 'number'),
-
-                TextInput::make('name')
-                    ->label('Customer Name')
-                    ->required(),
-            ]);
-    }
-
-    // Main Address Section
-    private static function mainAddressSection(): Card
-    {
-        return Card::make()
-            ->schema([
-                TextInput::make('corporateId')
-                    ->label('Corporate ID')
-                    ->maxLength(50)
-                    ->required(),
-
-                TextInput::make('main_address_line1')
-                    ->label('Main Address Line 1')
-                    ->required(),
-
-                TextInput::make('main_postal_code')
-                    ->label('Main Postal Code')
-                    ->required(),
-
-                TextInput::make('main_city')
-                    ->label('Main City')
-                    ->required(),
-
-                TextInput::make('main_country')
-                    ->label('Main Country')
-                    ->required(),
-
-                TextInput::make('main_county')
-                    ->label('Main County')
-                    ->required(),
-            ]);
-    }
-
-    // Invoice Address Section
-    private static function invoiceAddressSection(): Card
-    {
-        return Card::make()
-            ->schema([
-                TextInput::make('invoice_address_line1')
-                    ->label('Invoice Address Line 1')
-                    ->required(),
-
-                TextInput::make('invoice_postal_code')
-                    ->label('Invoice Postal Code')
-                    ->required(),
-
-                TextInput::make('invoice_city')
-                    ->label('Invoice City')
-                    ->required(),
-
-                TextInput::make('invoice_country')
-                    ->label('Invoice Country')
-                    ->required(),
-
-                TextInput::make('invoice_county')
-                    ->label('Invoice County')
-                    ->required(),
-            ]);
-    }
-
-    // Delivery Address Section
-    private static function deliveryAddressSection(): Card
-    {
-        return Card::make()
-            ->schema([
-                TextInput::make('delivery_address_line1')
-                    ->label('Delivery Address Line 1')
-                    ->required(),
-
-                TextInput::make('delivery_postal_code')
-                    ->label('Delivery Postal Code')
-                    ->required(),
-
-                TextInput::make('delivery_city')
-                    ->label('Delivery City')
-                    ->required(),
-
-                TextInput::make('delivery_country')
-                    ->label('Delivery Country')
-                    ->required(),
-
-                TextInput::make('delivery_county')
-                    ->label('Delivery County')
-                    ->required(),
-            ]);
-    }
-
-    // Main Contact Section
-    private static function mainContactSection(): Card
-    {
-        return Card::make()
-            ->schema([
-                TextInput::make('main_contact_name')
-                    ->label('Main Contact Name')
-                    ->required(),
-
-                TextInput::make('main_contact_attention')
-                    ->label('Main Contact Attention')
-                    ->required(),
-
-                TextInput::make('main_contact_email')
-                    ->label('Main Contact Email')
-                    ->required()
-                    ->email(),
-
-                TextInput::make('main_contact_phone')
-                    ->label('Main Contact Phone')
-                    ->required(),
-            ]);
-    }
-
-    // Invoice Contact Section
-    private static function invoiceContactSection(): Card
-    {
-        return Card::make()
-            ->schema([
-                TextInput::make('invoice_contact_name')
-                    ->label('Invoice Contact Name')
-                    ->required(),
-
-                TextInput::make('invoice_contact_attention')
-                    ->label('Invoice Contact Attention')
-                    ->required(),
-
-                TextInput::make('invoice_contact_email')
-                    ->label('Invoice Contact Email')
-                    ->required()
-                    ->email(),
-
-                TextInput::make('invoice_contact_phone')
-                    ->label('Invoice Contact Phone')
-                    ->required(),
-            ]);
-    }
-
-    // Delivery Contact Section (Optional)
-    private static function deliveryContactSection(): Card
-    {
-        return Card::make()
-            ->schema([
-                TextInput::make('delivery_contact_name')
-                    ->label('Delivery Contact Name')
-                    ->required(),
-
-                TextInput::make('delivery_contact_attention')
-                    ->label('Delivery Contact Attention')
-                    ->required(),
-
-                TextInput::make('delivery_contact_email')
-                    ->label('Delivery Contact Email')
-                    ->required()
-                    ->email(),
-
-                TextInput::make('delivery_contact_phone')
-                    ->label('Delivery Contact Phone')
-                    ->required(),
-                TextInput::make('customer_price_class_id	')
-                    ->label('Price class')
-                    ->required(),
-
-            ]);
-    }
-
-    // Define the table layout
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                TextColumn::make('name')
-                    ->label('Customer Name')
-                    ->sortable()
-                    ->searchable(),
-
-                TextColumn::make('number')
-                    ->label('Customer Number')
-                    ->sortable()
-                    ->searchable(),
-
-                TextColumn::make('main_address_line1')
-                    ->label('Main Address')
-                    ->sortable(),
-
-                TextColumn::make('main_contact_name')
-                    ->label('Main Contact Name')
-                    ->sortable(),
-
-                TextColumn::make('invoice_contact_name')
-                    ->label('Invoice Contact Name')
-                    ->sortable(),
-                TextColumn::make('customer_price_class_id')
-                    ->label('Costumer Price Class')
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('number')->searchable()->sortable()->label('Number'),
+                Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('corporateId')->label('Org nr')->searchable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('status')->sortable()->toggleable(),
+                Tables\Columns\TextColumn::make('customer_class_id')->label('Class')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('price_class_id')->label('Price class')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('currency_id')->label('Currency')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('credit_hold')->boolean()->label('Hold'),
+                Tables\Columns\TextColumn::make('credit_limit')->numeric(2)->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('balance')->numeric(2)->sortable()->toggleable(),
+                Tables\Columns\TextColumn::make('overdue_balance')->numeric(2)->sortable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('vat_registration_id')->label('VAT reg.')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('tax_zone_id')->label('Tax zone')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('main_city')->label('Main city')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('invoice_city')->label('Invoice city')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('delivery_city')->label('Delivery city')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('sales_person_id')->label('Salesperson')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('branch_id')->label('Branch')->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('updated_at')->dateTime()->since()->label('Updated'),
             ])
-            ->filters([
-                // Add filters if needed
-            ])
+            ->filters([])
             ->actions([
-                EditAction::make(),
+                Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make(),
-                Action::make('importVismaData')
-                    ->label('Import Visma Data')
-                    ->action(function () {
-                        try {
-                            Artisan::call('app:import-customers');
-                            Notification::make()
-                                ->title('Customers imported successfully from Visma.')
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Failed to import customers from Visma.')
-                                ->danger()
-                                ->body($e->getMessage())
-                                ->send();
-                        }
-                    })
+                Tables\Actions\DeleteBulkAction::make(),
             ]);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            // Define relations if applicable
-        ];
     }
 
     public static function getPages(): array
@@ -295,7 +326,7 @@ class CustomerResource extends Resource
         return [
             'index' => Pages\ListCustomers::route('/'),
             'create' => Pages\CreateCustomer::route('/create'),
-            'edit' => Pages\EditCustomer::route('/{record}/edit'),
+            'edit'  => Pages\EditCustomer::route('/{record}/edit'),
         ];
     }
 }

@@ -56,11 +56,11 @@ return array(
                 'mysql' => array(
                         'driver'    => 'mysql',
                         'host'      => 'localhost',
-                        'database'  => 'vbrxexdqza',
-                        'username'  => 'vbrxexdqza',
-                        'password'  => 'SrtmKQ6WEr',
-                        'charset'   => 'utf8',
-                        'collation' => 'utf8_unicode_ci',
+                        'database'  => 'bxuwkykpkp',
+                        'username'  => 'bxuwkykpkp',
+                        'password'  => 'Y5EWKVzR5V',
+                       'charset'   => 'utf8mb4',
+'collation' => 'utf8mb4_unicode_ci', // use _0900_ai_ci on MySQL 8 if available
                         'prefix'    => '',
                 ),
 

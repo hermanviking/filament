@@ -24,6 +24,9 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Str;
+use Filament\Forms as Forms;
+
 
 class ProductsResource extends Resource
 {
@@ -194,21 +197,21 @@ class ProductsResource extends Resource
                                             ->label('Attributes JSON')
                                             ->rows(5)
                                             ->helperText('Raw JSON attribute data returned from Visma.')
-                                            ->afterStateHydrated(fn (Textarea $component, $state) => $component->state($state ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''))
+                                            ->afterStateHydrated(fn(Textarea $component, $state) => $component->state($state ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''))
                                             ->disabled()
                                             ->dehydrated(false),
                                         Textarea::make('warehouse_details')
                                             ->label('Warehouse Details JSON')
                                             ->rows(5)
                                             ->helperText('Raw JSON warehouse data returned from Visma.')
-                                            ->afterStateHydrated(fn (Textarea $component, $state) => $component->state($state ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''))
+                                            ->afterStateHydrated(fn(Textarea $component, $state) => $component->state($state ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''))
                                             ->disabled()
                                             ->dehydrated(false),
                                         Textarea::make('cross_references')
                                             ->label('Cross References JSON')
                                             ->rows(5)
                                             ->helperText('Raw JSON cross reference data returned from Visma.')
-                                            ->afterStateHydrated(fn (Textarea $component, $state) => $component->state($state ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''))
+                                            ->afterStateHydrated(fn(Textarea $component, $state) => $component->state($state ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''))
                                             ->disabled()
                                             ->dehydrated(false),
                                     ])
@@ -244,17 +247,17 @@ class ProductsResource extends Resource
                     ->label('Price')
                     ->sortable()
                     ->alignRight()
-                    ->formatStateUsing(fn ($state): string => $state === null ? '-' : number_format((float) $state, 2) . ' kr'),
+                    ->formatStateUsing(fn($state): string => $state === null ? '-' : number_format((float) $state, 2) . ' kr'),
                 TextColumn::make('recommended_price')
                     ->label('Recommended')
                     ->alignRight()
                     ->toggleable()
-                    ->formatStateUsing(fn ($state): string => $state === null ? '-' : number_format((float) $state, 2) . ' kr'),
+                    ->formatStateUsing(fn($state): string => $state === null ? '-' : number_format((float) $state, 2) . ' kr'),
                 TextColumn::make('quantity_on_hand')
                     ->label('On Hand')
                     ->sortable()
                     ->alignRight()
-                    ->formatStateUsing(fn ($state): string => $state === null ? '-' : number_format((float) $state, 2)),
+                    ->formatStateUsing(fn($state): string => $state === null ? '-' : number_format((float) $state, 2)),
                 IconColumn::make('is_web_item')
                     ->label('Web')
                     ->boolean()
@@ -286,28 +289,56 @@ class ProductsResource extends Resource
             ])
             ->headerActions([
                 CreateAction::make(),
+
                 Action::make('importVismaData')
                     ->label('Import Visma Data')
                     ->icon('heroicon-o-cloud-arrow-down')
-                    ->requiresConfirmation()
-                    ->action(function () {
-                        try {
-                            Artisan::call('import:visma-products');
+                    ->modalHeading('Import products from Visma')
+                    ->modalSubmitActionLabel('Run import')
+                    ->form([
+                        Forms\Components\Select::make('status')
+                            ->label('Status')
+                            ->options([
+                                'Active' => 'Active',
+                                'Inactive' => 'Inactive',
+                            ])
+                            ->default('Active')
+                            ->required(),
+                        Forms\Components\TextInput::make('page_size')
+                            ->label('Page size')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(100) // Inventory API typically maxes at 100
+                            ->default(100)
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        $status   = $data['status'] ?? 'Active';
+                        $pageSize = (int) ($data['page_size'] ?? 100);
+
+                        $exit = Artisan::call('import:visma-products', [
+                            '--status'    => $status,
+                            '--page-size' => $pageSize,
+                        ]);
+
+                        $output = trim(Artisan::output());
+
+                        if ($exit !== 0) {
                             Notification::make()
-                                ->title('Products imported successfully from Visma.')
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Failed to import products from Visma.')
+                                ->title('Failed to import products from Visma')
                                 ->danger()
-                                ->body($e->getMessage())
+                                ->body(Str::limit($output, 1000))
                                 ->send();
+                            return;
                         }
-                    })
-                    
-                ]);
-            
+
+                        Notification::make()
+                            ->title('Products imported successfully from Visma')
+                            ->success()
+                            ->body(Str::limit($output, 1000))
+                            ->send();
+                    }),
+            ]);
     }
 
     public static function getRelations(): array
